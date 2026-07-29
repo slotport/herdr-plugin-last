@@ -35,6 +35,21 @@ pub fn record(path: &Path, id: &str) -> std::io::Result<()> {
     write_atomic(path, &entries)
 }
 
+/// The first MRU entry worth jumping to, or `None`.
+///
+/// Entries are filtered against the *live* current id rather than assuming the
+/// head of the list is accurate, so a missed focus event cannot make the jump
+/// land on the tab the user is already looking at.
+///
+/// Filtering against `live` is required rather than defensive: `herdr tab focus`
+/// on a deleted tab exits 0, so a try-and-check-status fallback would silently
+/// do nothing instead of moving on to the next candidate.
+pub fn pick_target(path: &Path, current: &str, live: &[String]) -> Option<String> {
+    read(path)
+        .into_iter()
+        .find(|id| id != current && live.iter().any(|candidate| candidate == id))
+}
+
 /// Replaces `path` with `entries` atomically, so a concurrent reader never
 /// observes a half-written list. The temp file is created in the destination
 /// directory so the rename stays on one filesystem.
@@ -233,5 +248,113 @@ mod tests {
         record(&named, "w5:t7").unwrap();
         assert_eq!(read(&default), vec!["w5:t1"]);
         assert_eq!(read(&named), vec!["w5:t7"]);
+    }
+
+    fn write_mru(dir: &tempfile::TempDir, contents: &str) -> std::path::PathBuf {
+        let path = dir.path().join("tabs");
+        fs::write(&path, contents).unwrap();
+        path
+    }
+
+    fn live(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    #[test]
+    fn pick_target_skips_the_current_id() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t2\nw5:t1\n");
+        assert_eq!(
+            pick_target(&path, "w5:t2", &live(&["w5:t1", "w5:t2"])),
+            Some("w5:t1".to_string())
+        );
+    }
+
+    #[test]
+    fn pick_target_skips_ids_that_no_longer_exist() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t2\nw5:t9\nw5:t1\n");
+        assert_eq!(
+            pick_target(&path, "w5:t2", &live(&["w5:t1", "w5:t2"])),
+            Some("w5:t1".to_string())
+        );
+    }
+
+    #[test]
+    fn pick_target_is_none_when_only_the_current_id_remains() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t2\n");
+        assert_eq!(pick_target(&path, "w5:t2", &live(&["w5:t1", "w5:t2"])), None);
+    }
+
+    #[test]
+    fn pick_target_is_none_when_every_candidate_is_dead() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t9\n");
+        assert_eq!(pick_target(&path, "w5:t2", &live(&["w5:t1", "w5:t2"])), None);
+    }
+
+    #[test]
+    fn pick_target_is_none_for_a_missing_file() {
+        let dir = sandbox();
+        let path = dir.path().join("absent");
+        assert_eq!(pick_target(&path, "w5:t2", &live(&["w5:t1"])), None);
+    }
+
+    #[test]
+    fn pick_target_is_none_for_an_empty_file() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "");
+        assert_eq!(pick_target(&path, "w5:t2", &live(&["w5:t1"])), None);
+    }
+
+    #[test]
+    fn pick_target_works_when_the_current_id_is_unknown() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t2\nw5:t1\n");
+        assert_eq!(
+            pick_target(&path, "", &live(&["w5:t1", "w5:t2"])),
+            Some("w5:t2".to_string())
+        );
+    }
+
+    // Guards the shell's `grep -qxF -x` flag: a dead id that is a literal prefix
+    // of a live id must not be treated as live.
+    #[test]
+    fn pick_target_requires_an_exact_match_not_a_prefix() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t1\n");
+        assert_eq!(pick_target(&path, "w5:t9", &live(&["w5:t12"])), None);
+    }
+
+    // Guards the shell's `grep -qxF -F` flag: the `.` in w5:t1.2 must be matched
+    // literally against the live set, not as a regex wildcard.
+    #[test]
+    fn pick_target_matches_live_ids_literally_not_as_a_regex() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t1.2\n");
+        assert_eq!(pick_target(&path, "w5:t9", &live(&["w5:t1X2"])), None);
+    }
+
+    // Regression guard for a real defect: the shell `while read` loop dropped
+    // the final entry when the file had no trailing newline.
+    #[test]
+    fn pick_target_selects_a_final_entry_with_no_trailing_newline() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t1");
+        assert_eq!(
+            pick_target(&path, "w9", &live(&["w5:t1"])),
+            Some("w5:t1".to_string())
+        );
+    }
+
+    #[test]
+    fn pick_target_returns_the_first_survivor_not_the_last() {
+        let dir = sandbox();
+        let path = write_mru(&dir, "w5:t3\nw5:t2\nw5:t1\n");
+        assert_eq!(
+            pick_target(&path, "w5:t9", &live(&["w5:t1", "w5:t2", "w5:t3"])),
+            Some("w5:t3".to_string())
+        );
     }
 }
