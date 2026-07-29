@@ -34,6 +34,7 @@ new_sandbox() {
     HERDR_SOCKET_PATH="/home/test/.config/herdr/herdr.sock"
     export HERDR_PLUGIN_STATE_DIR HERDR_SOCKET_PATH
     mkdir -p "$HERDR_PLUGIN_STATE_DIR"
+    unset HERDR_WORKSPACE_ID HERDR_TAB_ID HERDR_PANE_ID
 }
 
 drop_sandbox() {
