@@ -173,6 +173,26 @@ assert_eq "record_mru leaves the other session's history intact" \
     "w5:t1" "$(cat "$(session_dir)/tabs/w5")"
 drop_sandbox
 
+new_sandbox
+f="$SANDBOX/prefix"
+record_mru "$f" "w5:t12"
+record_mru "$f" "w5:t1"
+record_mru "$f" "w5:t1"
+assert_eq "grep -vxF filters whole lines only; w5:t12 survives when w5:t1 is re-recorded" \
+    "w5:t1
+w5:t12" "$(cat "$f")"
+drop_sandbox
+
+new_sandbox
+f="$SANDBOX/metachar"
+record_mru "$f" "w5:t1X2"
+record_mru "$f" "w5:t1.2"
+record_mru "$f" "w5:t1.2"
+assert_eq "grep -vxF uses literal strings; w5:t1X2 survives when w5:t1.2 is re-recorded" \
+    "w5:t1.2
+w5:t1X2" "$(cat "$f")"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
