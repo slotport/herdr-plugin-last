@@ -807,7 +807,7 @@ chmod +x jump-tab.sh jump-workspace.sh
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `38 tests, 0 failures`
+Expected: PASS — `37 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -1000,7 +1000,7 @@ directory with a stub `herdr` binary.
 - [ ] **Step 7: Run the full test suite once more**
 
 Run: `./test.sh`
-Expected: PASS — `38 tests, 0 failures`
+Expected: PASS — `37 tests, 0 failures`
 
 - [ ] **Step 8: Commit**
 
