@@ -35,6 +35,22 @@ description = "last workspace"
 
 Reload with `herdr server reload-config`.
 
+`prefix+semicolon` mirrors tmux's `last-window`, but check it is free first —
+Herdr's `last_pane` action ships unbound, and `prefix+;` is a popular place to
+put it. If you already use it there, `prefix+tab` is a good alternative for
+last-tab:
+
+```toml
+[[keys.command]]
+key = "prefix+tab"
+type = "plugin_action"
+command = "m4salah.last.last-tab"
+description = "last tab"
+```
+
+A binding that collides is not reported as an error, so it is worth checking
+`~/.config/herdr/config.toml` rather than assuming.
+
 ## How it works
 
 Two event hooks on `tab.focused` and `workspace.focused` keep a small
