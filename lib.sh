@@ -90,7 +90,7 @@ pick_target() {
     _path=$1
     _current=$2
     _live=$3
-    read_mru "$_path" | while IFS= read -r _id; do
+    read_mru "$_path" | while IFS= read -r _id || [ -n "$_id" ]; do
         if [ -z "$_id" ]; then
             continue
         fi

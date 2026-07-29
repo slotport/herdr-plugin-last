@@ -320,6 +320,24 @@ printf 'w5:t2\nw5:t1\n' > "$f"
 assert_eq "pick_target still works when the current id is unknown" \
     "w5:t2" "$(pick_target "$f" "" "w5:t1
 w5:t2")"
+
+# grep -x guard: a dead id that is a literal prefix of a live id must not be
+# treated as a match.
+printf 'w5:t1\n' > "$f"
+assert_eq "pick_target requires an exact match, not a prefix (grep -x)" \
+    "" "$(pick_target "$f" "w5:t9" "w5:t12")"
+
+# grep -F guard: an id containing a regex metacharacter must be matched
+# literally against the live set, mirroring the record_mru metachar tests.
+printf 'w5:t1.2\n' > "$f"
+assert_eq "pick_target matches live ids literally, not as a regex (grep -F)" \
+    "" "$(pick_target "$f" "w5:t9" "w5:t1X2")"
+
+# `read` returns non-zero on an unterminated final line; the loop condition
+# must still process it instead of silently dropping the last entry.
+printf 'w5:t1' > "$f"
+assert_eq "pick_target selects the final entry even without a trailing newline" \
+    "w5:t1" "$(pick_target "$f" "w9" "w5:t1")"
 drop_sandbox
 
 # --- summary -------------------------------------------------------------
