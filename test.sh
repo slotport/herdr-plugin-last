@@ -340,6 +340,75 @@ assert_eq "pick_target selects the final entry even without a trailing newline" 
     "w5:t1" "$(pick_target "$f" "w9" "w5:t1")"
 drop_sandbox
 
+# --- jump entrypoints ----------------------------------------------------
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)/tabs"
+printf 'w5:t2\nw5:t1\n' > "$(session_dir)/tabs/w5"
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "jump-tab.sh focuses the last live tab" \
+    "tab w5:t1" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)/tabs"
+printf 'w5:t2\nw5:t9\n' > "$(session_dir)/tabs/w5"
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "jump-tab.sh issues no call when every candidate is dead" \
+    "" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "jump-tab.sh issues no call with no history file" \
+    "" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)/tabs"
+printf 'w5:t2\nw5:t1\n' > "$(session_dir)/tabs/w5"
+HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "jump-tab.sh issues no call without HERDR_WORKSPACE_ID" \
+    "" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_workspaces_two
+mkdir -p "$(session_dir)"
+printf 'w5\nw9\n' > "$(session_dir)/workspaces"
+HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/jump-workspace.sh"
+assert_eq "jump-workspace.sh focuses the last live workspace" \
+    "workspace w9" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+# Toggle: drive record between jumps the way Herdr's focus events would, and
+# confirm two presses return to the starting tab.
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/record-tab.sh"
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/record-tab.sh"
+
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "toggle: first press leaves t2 for t1" \
+    "tab w5:t1" "$(cat "$STUB_CALLS")"
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/record-tab.sh"
+
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/jump-tab.sh"
+assert_eq "toggle: second press returns to t2" \
+    "tab w5:t1
+tab w5:t2" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
