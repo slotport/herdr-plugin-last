@@ -17,6 +17,9 @@ Herdr 0.7.5+, Linux or macOS.
 herdr plugin install m4salah/herdr-plugin-last
 ```
 
+A public repo is listed in Herdr's plugin marketplace by adding the GitHub topic
+`herdr-plugin` to it.
+
 Then bind the keys in `~/.config/herdr/config.toml`:
 
 ```toml
