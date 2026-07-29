@@ -94,7 +94,16 @@ herdr plugin link "$PWD"
 real scripts against a temporary state directory with a stub `herdr` binary, and
 is hermetic: it passes identically inside a Herdr session and outside one.
 
-Tests are mutation-checked. Each defensive detail in the implementation has a
-test that fails when that detail is removed — the `grep -x` whole-line match, the
-`grep -F` literal match, the missing-variable guards, and the unterminated-final-
-line handling in `pick_target`. If you change any of those, a test should go red.
+Tests are mutation-checked for the details that are observable in behaviour.
+Each of these fails a test when removed: the `grep -x` whole-line match, the
+`grep -F` literal match, `pick_target`'s unterminated-final-line handling, the
+workspace-id guards in `record-tab.sh` and `jump-tab.sh`, the empty-target
+guards in both jump scripts, and the `HERDR_PLUGIN_STATE_DIR` guard in all four
+entrypoints. If you change any of those, a test should go red.
+
+Two guards are redundant defense-in-depth that no test can detect removing:
+`record-tab.sh`'s `HERDR_TAB_ID` check and `record-workspace.sh`'s
+`HERDR_WORKSPACE_ID` check. `record_mru` already no-ops on a blank id before
+writing anything, so a blank tab or workspace id causes no observable
+difference whether or not the script-level check runs first — the checks are
+just an earlier, cheaper place to stop.
