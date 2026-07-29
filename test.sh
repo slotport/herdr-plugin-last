@@ -284,6 +284,40 @@ assert_eq "toggle: second press returns to t2" \
 tab w5:t2" "$(cat "$STUB_CALLS")"
 drop_sandbox
 
+# --- record/jump exit asymmetry -------------------------------------------
+#
+# The record hooks let a genuine write failure reach Herdr's plugin log; the
+# jump actions swallow everything and always exit 0. That asymmetry is the
+# most important behaviour in this port, and every other test in this file
+# reaches only guard conditions, which exit 0 on both paths by design — so
+# without this section, deleting the asymmetry entirely goes undetected.
+#
+# The failure is induced by creating the directory record needs as a regular
+# FILE, so create_dir_all fails with EEXIST. No permissions are involved, so
+# this behaves the same when run as root.
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)"
+: > "$(session_dir)/tabs"
+status=0
+out=$(HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" record-tab 2>&1) || status=$?
+assert_ne "record-tab exits non-zero when the write fails" "0" "$status"
+assert_ne "record-tab reports the failure on stderr" "" "$out"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)"
+: > "$(session_dir)/tabs"
+status=0
+out=$(HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" jump-tab 2>&1) || status=$?
+assert_eq "jump-tab exits 0 when the state path is unusable" "0" "$status"
+assert_eq "jump-tab stays silent when the state path is unusable" "" "$out"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
