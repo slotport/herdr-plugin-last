@@ -61,3 +61,137 @@ Deferred minors triaged at final review, none merge-blocking: path traversal via
 BRANCH COMPLETE: 62 tests, 0 failures. 22 commits on feat/last-tab-workspace. Live and confirmed working by the user.
 
 NOTE ON TEST COUNTS: the plan's per-task cumulative counts have been revised twice as review-driven fix rounds added assertions. Current actual: Task 1 = 10, Task 2 = 21. The binding requirement for later tasks is "0 failures and every listed assertion present", not the absolute number.
+
+---
+
+# SDD ledger — plan: docs/superpowers/plans/2026-07-29-rust-port.md
+
+Repo: /Users/mohamed-kenzz/Desktop/m4salah/herdr-plugin-last
+Branch: feat/rust-port
+Merge base: b8c5af9 (docs: preserve build notes and accepted limitations)
+
+Replaced the four POSIX sh entrypoints (record-tab.sh, record-workspace.sh,
+jump-tab.sh, jump-workspace.sh) and lib.sh, all recorded above, with one Rust
+binary `last` (src/main.rs, context.rs, mru.rs, herdr.rs), built by
+`cargo build --release` and invoked by the manifest's four commands as
+`./target/release/last <subcommand>`. All five shell files are deleted.
+
+Tasks:
+1. Cargo scaffold and context.rs — commits a7a4097, d2764f1 (fix round)
+2. mru.rs — read, atomic write, record — commit c04b7f3
+3. mru.rs — pick_target — commit 5f76b81
+4. herdr.rs — CLI client — commits fb45a6f, 90ba54f, e9a402a (fix rounds)
+5. main.rs, manifest, retargeted test.sh — commits ba2b4b2, 33c09ca (fix round)
+6. Documentation (this entry) — README + this section only; live verification
+   handled separately, see below.
+
+Final counts: `cargo test` 42 passed / 0 failed. `./test.sh` 33 assertions, 0
+failures (29 retargeted from the shell suite + 4 new, covering the record/jump
+exit asymmetry). `cargo clippy --all-targets -- -D warnings` clean.
+
+## PLAN-MANDATED FINDING, escalated to the user (Task 1)
+
+Test `env_id_treats_empty_as_absent` (src/context.rs) called only the private
+`non_empty` helper and never `env_id` itself, so `env_id`'s actual env-reading
+contract — including the genuinely-unset branch — had zero coverage while the
+test's name claimed otherwise. The plan mandated this test verbatim, but the
+controller had authored that plan text, so the plan carried no independent
+authority to justify leaving the gap.
+USER RULING: add a real `env_id` test AND rename the `non_empty` one. Coverage
+gap closed, not relabelled.
+It mattered beyond bookkeeping: Task 3's mutation battery (M8, env_id drops
+the unset-or-empty rule) is CAUGHT only because of the test this ruling added.
+Before the fix, no test called `env_id` at all, so nothing could have detected
+a regression in it.
+LESSON: a test name asserting coverage of a function is not evidence the
+function is actually invoked. Read what a test calls, not what it's named.
+
+## Coverage gaps controller mutation testing found that review missed
+
+- GAP (Task 4, mutation M12): `herdr_bin()`'s fallback `"herdr" -> ""` went
+  uncaught. Traced to a PLAN defect, not an implementer one — the plan
+  assigned the shell suite's two herdr_bin assertions to "Task 1, Task 4" but
+  neither task's concrete test list actually contained either one, silently
+  dropping them despite the plan's "no case is dropped" claim. Low real-world
+  risk (Herdr always injects HERDR_BIN_PATH; the fallback only keeps the
+  binary runnable by hand outside a session) but cheap to close. Fixed in
+  Task 4 fix round 1 with a dedicated test covering set / empty / unset.
+- GAP (Task 5, mutation S6): `report()` swallowing I/O errors would collapse
+  the record/jump exit-code asymmetry — the spec's most important behaviour to
+  port correctly — and nothing in the suite caught it. Controller verified a
+  deterministic trigger: make `$(session_dir)/tabs` a regular file so
+  `create_dir_all` fails with EEXIST. Measured directly: record-tab exits 1
+  with `herdr-plugin-last: File exists (os error 17)` on stderr; jump-tab
+  exits 0 silently on the identical failure. The shell version had this same
+  untested gap, so closing it is a coverage improvement over the original, not
+  a regression. Fixed in Task 5 fix round 1 (four new shell assertions); the
+  reviewer additionally confirmed the asymmetry is enforced at the type level
+  (record_* returns `io::Result`, jump_* returns `()` with no way to
+  propagate failure even deliberately), not just by convention.
+- NON-GAP, ruled (Task 5, mutation S4): `record_*` replacing its state-dir
+  guard with a fallback `Context` also went uncaught, but is not a real gap.
+  The mutation had to invent a fallback Context — the accidental form
+  (forgetting the guard) cannot even be written, because `let ... else`
+  requires a diverging else branch. Separately, the guard tests deliberately
+  assert only on sandbox contents, never on an absolute path like `/tabs`,
+  inherited from the shell suite's own comment that tests must not risk
+  touching the real filesystem root. Flagged to final review rather than
+  looped on.
+
+## Controller errors this ledger records
+
+- Stale test counts: the plan's per-task cumulative counts went stale
+  repeatedly as review-driven fix rounds added assertions — Task 3 caught the
+  plan claiming "32 tests total" against an actual 34. Counts were revised
+  more than once across the branch (see the plan's own NOTE ON TEST COUNTS).
+  Absolute numbers were never the binding requirement; "0 failures and every
+  listed assertion present" was.
+- 42-vs-41 arithmetic slip (Task 4): a fix-round instruction told the
+  implementer to expect 42 tests; 40 + 1 = 41 (the bundled `"result": null`
+  assertion landed inside an existing test and added nothing). The
+  implementer reported the true 41 rather than matching the wrong number, and
+  the re-reviewer independently confirmed it from the diff.
+- Shallow M11 conclusion, corrected by the reviewer (Task 4).
+  CORRECTION: the controller had recorded that mutating `Envelope::result`
+  from `Option<T>` to plain `T` "does not compile", implying the Option was
+  type-enforced. The reviewer's analysis was deeper and correct: with plain
+  `T`, a missing `result` key just fails deserialization, `.ok()` maps that to
+  `None`, and the parser still returns an empty vec — behaviour is IDENTICAL,
+  so no existing test could distinguish the two designs. The mutation had only
+  failed to compile because the controller didn't also adjust the
+  `.and_then()` call site; the Option was justified by design reasoning alone,
+  not by any discriminating test. Fixed by adding an explicit
+  `"result": null` fixture in the same fix round, which does discriminate.
+- Doc count typo (Task 5): the controller wrote "41 as executed" in a doc
+  where every other figure said 42. Caught by the reviewer and fixed.
+
+## Deferred minors (not merge-blocking; for a future reader to triage)
+
+- write_atomic's temp file is created via `NamedTempFile::new_in(dir)`, but no
+  test asserts it lands specifically inside the destination directory rather
+  than system tmp (Task 2). On macOS both currently share a filesystem, so a
+  regression to `NamedTempFile::new()` would still pass every current test.
+- write_atomic's "path has no parent" branch (reachable via
+  `record(Path::new("/"), id)`) is untested (Task 2).
+- `pick_target`'s correctness for `current == ""` depends on `read()`
+  filtering blank lines — an implicit, documented-but-not-compiler-checked
+  cross-function contract (Task 3).
+- src/mru.rs is ~360 lines holding read/record/write_atomic/pick_target plus
+  28 colocated tests. Plan-mandated placement, not an implementer choice;
+  worth watching if more selection logic accretes (Task 3).
+- The ba2b4b2 commit (Task 5) swept in two uncommitted doc edits of the
+  controller's own via `git add -A` — content was legitimate (test-count
+  corrections belonging on this branch) but bundled into the wrong commit.
+  Not worth rewriting history; recorded so it isn't a surprise later.
+
+## Live verification
+
+NOT DONE as of this entry. Task 6's brief calls for linking the plugin into a
+real Herdr session, running `herdr server reload-config`, and confirming both
+keybindings by hand — including the closed-target degradation case and the
+exact `~/.local/state/herdr/plugins/...` path. That step needs a person at the
+keyboard and mutates the user's live terminal session, so it is being done by
+the controller directly with the user, separately from this documentation
+pass. This section and the README updates cover documentation only; their
+presence is not evidence the port has been confirmed working in a real
+session.

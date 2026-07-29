@@ -9,7 +9,11 @@ Both toggle: press twice and you are back where you started.
 
 ## Requires
 
-Herdr 0.7.5+, Linux or macOS.
+Herdr 0.7.5+, Linux or macOS, and a Rust toolchain.
+
+`herdr plugin install` compiles the plugin from source. Herdr captures build
+output and only shows it on failure, so install looks like it has hung for the
+duration of the build — around 10 seconds cold.
 
 ## Install
 
@@ -89,24 +93,25 @@ Two details are load-bearing and deliberately not simplified:
 ## Development
 
 ```bash
-herdr plugin link "$PWD"
-./test.sh
+cargo build --release && herdr plugin link "$PWD"
+cargo test && ./test.sh
 ```
 
-`test.sh` needs no dependencies — no jq, no node, no test framework. It runs the
-real scripts against a temporary state directory with a stub `herdr` binary, and
-is hermetic: it passes identically inside a Herdr session and outside one.
+`herdr plugin link` does **not** run manifest build commands, so a linked plugin
+happily keeps running a stale binary until you rebuild. `test.sh` builds before
+asserting anything for exactly this reason.
 
-Tests are mutation-checked for the details that are observable in behaviour.
-Each of these fails a test when removed: the `grep -x` whole-line match, the
-`grep -F` literal match, `pick_target`'s unterminated-final-line handling, the
-workspace-id guards in `record-tab.sh` and `jump-tab.sh`, the empty-target
-guards in both jump scripts, and the `HERDR_PLUGIN_STATE_DIR` guard in all four
-entrypoints. If you change any of those, a test should go red.
+`cargo test` runs 42 tests covering the pure logic: MRU ordering and capping,
+target selection, and CLI response parsing. `test.sh` runs 33 assertions
+covering what unit tests cannot reach — exit codes, silence, and which `herdr`
+calls each entrypoint actually issues. Beyond a POSIX shell and a Rust
+toolchain (`test.sh` invokes `cargo build --release` itself, see above), it
+needs nothing — no jq, no node, no test framework. It runs the real binary
+against a temporary state directory with a stub `herdr`, and is hermetic: it
+passes identically inside a Herdr session and outside one.
 
-Two guards are redundant defense-in-depth that no test can detect removing:
-`record-tab.sh`'s `HERDR_TAB_ID` check and `record-workspace.sh`'s
-`HERDR_WORKSPACE_ID` check. `record_mru` already no-ops on a blank id before
-writing anything, so a blank tab or workspace id causes no observable
-difference whether or not the script-level check runs first — the checks are
-just an earlier, cheaper place to stop.
+Three defects the shell version had to fix by hand are structurally impossible
+in the port: dropping an MRU file's final entry when it lacks a trailing
+newline, matching ids by prefix or as a regex instead of literally, and
+continuing with an empty state directory when `HERDR_PLUGIN_STATE_DIR` is
+missing. Their tests remain as regression guards.
