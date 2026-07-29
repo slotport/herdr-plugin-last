@@ -295,7 +295,7 @@ The 33 cover `MRU_LIMIT`, `herdr_bin`, `session_dir`, `read_mru`,
 `write_atomic`, `record_mru`, `live_tab_ids`, and `pick_target`. Every case
 carries over one-for-one, including the three regression guards that matter
 most: the prefix collision, the regex metacharacter, and the unterminated final
-line. No case is dropped. Totals go from 62 to 67.
+line. No case is dropped. Totals go from 62 to 71.
 
 `live_tab_ids` cannot be unit-tested against a shell stub from Rust, so
 `herdr.rs` splits into pure `parse_tab_ids` / `parse_workspace_ids` functions

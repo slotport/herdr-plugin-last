@@ -1,26 +1,29 @@
 id = "m4salah.last"
 name = "Last"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.7.5"
 description = "tmux-style last-tab and last-workspace navigation"
 platforms = ["linux", "macos"]
 
+[[build]]
+command = ["cargo", "build", "--release"]
+
 [[events]]
 on = "tab.focused"
-command = ["sh", "record-tab.sh"]
+command = ["./target/release/last", "record-tab"]
 
 [[events]]
 on = "workspace.focused"
-command = ["sh", "record-workspace.sh"]
+command = ["./target/release/last", "record-workspace"]
 
 [[actions]]
 id = "last-tab"
 title = "Last tab"
 contexts = ["workspace"]
-command = ["sh", "jump-tab.sh"]
+command = ["./target/release/last", "jump-tab"]
 
 [[actions]]
 id = "last-workspace"
 title = "Last workspace"
 contexts = ["workspace"]
-command = ["sh", "jump-workspace.sh"]
+command = ["./target/release/last", "jump-workspace"]
