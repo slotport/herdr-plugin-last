@@ -12,4 +12,16 @@ if [ -z "$ws" ] || [ -z "$tab" ]; then
     exit 0
 fi
 
-record_mru "$(session_dir)/tabs/$ws" "$tab"
+# session_dir() is called here, not inline in the record_mru argument: in
+# `$(session_dir)/tabs/$ws`, session_dir's `:?` only aborts the subshell, so
+# an unset HERDR_PLUGIN_STATE_DIR would leave the parent script continuing
+# with an empty string and writing under the filesystem root instead.
+# Stderr is discarded too: command substitution only captures stdout, so
+# session_dir's `:?` diagnostic would otherwise still leak to the terminal
+# even though this script must stay silent.
+dir=$(session_dir 2>/dev/null) || exit 0
+if [ -z "$dir" ]; then
+    exit 0
+fi
+
+record_mru "$dir/tabs/$ws" "$tab"

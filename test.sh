@@ -406,6 +406,68 @@ assert_eq "jump-workspace.sh issues no call when every candidate is dead" \
     "" "$(cat "$STUB_CALLS")"
 drop_sandbox
 
+# --- missing HERDR_PLUGIN_STATE_DIR guard ---------------------------------
+#
+# Regression guard for a real defect: session_dir()'s
+# ${HERDR_PLUGIN_STATE_DIR:?} only aborts the $( ) subshell it runs in. Called
+# inline in an argument position, e.g. "$(session_dir)/tabs/$ws", the parent
+# script would continue with an empty string, turning the path into an
+# absolute path at the filesystem root. Herdr always sets the variable in
+# production, but lib.sh's own comment promises the scripts stay runnable by
+# hand, which is exactly the case that triggers this. Each entrypoint must
+# resolve session_dir() into a variable first and bail out silently instead.
+#
+# HERDR_PLUGIN_STATE_DIR is unset inside a "(...)" subshell so the unset
+# cannot leak into later tests under this suite's own "set -u" — the parent
+# test.sh process never loses the variable, and new_sandbox re-exports it on
+# the next call regardless. Nothing here asserts on an absolute path like
+# /tabs; only exit status, output, and the sandbox's own contents are
+# checked, so this test cannot touch the real filesystem root.
+
+new_sandbox
+status=0
+out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/record-tab.sh") 2>&1) || status=$?
+assert_eq "record-tab.sh exits 0 without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$status"
+assert_eq "record-tab.sh is silent without HERDR_PLUGIN_STATE_DIR" \
+    "" "$out"
+assert_eq "record-tab.sh creates no file without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$(find "$SANDBOX" -type f | wc -l | tr -d ' ')"
+drop_sandbox
+
+new_sandbox
+status=0
+out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/record-workspace.sh") 2>&1) || status=$?
+assert_eq "record-workspace.sh exits 0 without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$status"
+assert_eq "record-workspace.sh is silent without HERDR_PLUGIN_STATE_DIR" \
+    "" "$out"
+assert_eq "record-workspace.sh creates no file without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$(find "$SANDBOX" -type f | wc -l | tr -d ' ')"
+drop_sandbox
+
+new_sandbox
+status=0
+out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/jump-tab.sh") 2>&1) || status=$?
+assert_eq "jump-tab.sh exits 0 without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$status"
+assert_eq "jump-tab.sh is silent without HERDR_PLUGIN_STATE_DIR" \
+    "" "$out"
+assert_eq "jump-tab.sh creates no file without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$(find "$SANDBOX" -type f | wc -l | tr -d ' ')"
+drop_sandbox
+
+new_sandbox
+status=0
+out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/jump-workspace.sh") 2>&1) || status=$?
+assert_eq "jump-workspace.sh exits 0 without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$status"
+assert_eq "jump-workspace.sh is silent without HERDR_PLUGIN_STATE_DIR" \
+    "" "$out"
+assert_eq "jump-workspace.sh creates no file without HERDR_PLUGIN_STATE_DIR" \
+    "0" "$(find "$SANDBOX" -type f | wc -l | tr -d ' ')"
+drop_sandbox
+
 # Toggle: drive record between jumps the way Herdr's focus events would, and
 # confirm two presses return to the starting tab.
 new_sandbox
