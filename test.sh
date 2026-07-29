@@ -202,15 +202,22 @@ HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/record-tab.sh"
 assert_eq "record-tab.sh records into the workspace's tab file" \
     "w5:t2
 w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+drop_sandbox
 
-HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/record-tab.sh"
-assert_eq "record-tab.sh is a no-op without HERDR_TAB_ID" \
-    "w5:t2
-w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+new_sandbox
+out=$(HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/record-tab.sh" 2>&1 || true)
+assert_eq "record-tab.sh is a no-op without HERDR_TAB_ID (silence)" \
+    "" "$out"
+assert_eq "record-tab.sh is a no-op without HERDR_TAB_ID (no files created)" \
+    "0" "$(find "$(session_dir)" -type f 2>/dev/null | wc -l | tr -d ' ')"
+drop_sandbox
 
-HERDR_TAB_ID="w9:t1" sh "$SCRIPT_DIR/record-tab.sh"
-assert_eq "record-tab.sh is a no-op without HERDR_WORKSPACE_ID" \
-    "0" "$(find "$(session_dir)/tabs" -name 'w9' | wc -l | tr -d ' ')"
+new_sandbox
+out=$(HERDR_TAB_ID="w9:t1" sh "$SCRIPT_DIR/record-tab.sh" 2>&1 || true)
+assert_eq "record-tab.sh is a no-op without HERDR_WORKSPACE_ID (silence)" \
+    "" "$out"
+assert_eq "record-tab.sh is a no-op without HERDR_WORKSPACE_ID (no files created)" \
+    "0" "$(find "$(session_dir)" -type f 2>/dev/null | wc -l | tr -d ' ')"
 drop_sandbox
 
 new_sandbox
@@ -219,11 +226,14 @@ HERDR_WORKSPACE_ID="w9" sh "$SCRIPT_DIR/record-workspace.sh"
 assert_eq "record-workspace.sh records into the workspaces file" \
     "w9
 w5" "$(cat "$(session_dir)/workspaces")"
+drop_sandbox
 
-sh "$SCRIPT_DIR/record-workspace.sh"
-assert_eq "record-workspace.sh is a no-op without HERDR_WORKSPACE_ID" \
-    "w9
-w5" "$(cat "$(session_dir)/workspaces")"
+new_sandbox
+out=$(sh "$SCRIPT_DIR/record-workspace.sh" 2>&1 || true)
+assert_eq "record-workspace.sh is a no-op without HERDR_WORKSPACE_ID (silence)" \
+    "" "$out"
+assert_eq "record-workspace.sh is a no-op without HERDR_WORKSPACE_ID (no files created)" \
+    "0" "$(find "$(session_dir)" -type f 2>/dev/null | wc -l | tr -d ' ')"
 drop_sandbox
 
 # --- summary -------------------------------------------------------------
