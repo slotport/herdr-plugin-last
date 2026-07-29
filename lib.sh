@@ -56,3 +56,50 @@ record_mru() {
         printf '%s\n' "$_id" | write_atomic "$_path"
     fi
 }
+
+# Ids of tabs that currently exist in a workspace, one per line.
+#
+# Herdr prints the whole list as one line of JSON. Splitting on commas and
+# pulling the tab_id field avoids a jq dependency; the -n/p pair means lines
+# without the field produce nothing.
+live_tab_ids() {
+    "$(herdr_bin)" tab list --workspace "$1" 2>/dev/null \
+        | tr ',' '\n' \
+        | sed -n 's/.*"tab_id":"\([^"]*\)".*/\1/p'
+}
+
+# Ids of workspaces that currently exist, one per line.
+live_workspace_ids() {
+    "$(herdr_bin)" workspace list 2>/dev/null \
+        | tr ',' '\n' \
+        | sed -n 's/.*"workspace_id":"\([^"]*\)".*/\1/p'
+}
+
+# Print the first MRU entry worth jumping to, or nothing.
+#
+#   pick_target <mru-path> <current-id> <live-ids>
+#
+# Entries are filtered against the *live* current id rather than assuming the
+# head of the list is accurate, so a missed focus event cannot make the jump
+# land on the tab the user is already looking at.
+#
+# Filtering against <live-ids> is required rather than defensive: `herdr tab
+# focus` on a deleted tab exits 0, so a try-and-check-status fallback would
+# silently do nothing instead of moving to the next candidate.
+pick_target() {
+    _path=$1
+    _current=$2
+    _live=$3
+    read_mru "$_path" | while IFS= read -r _id; do
+        if [ -z "$_id" ]; then
+            continue
+        fi
+        if [ "$_id" = "$_current" ]; then
+            continue
+        fi
+        if printf '%s\n' "$_live" | grep -qxF "$_id"; then
+            printf '%s\n' "$_id"
+            break
+        fi
+    done | head -n 1
+}

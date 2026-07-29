@@ -236,6 +236,92 @@ assert_eq "record-workspace.sh is a no-op without HERDR_WORKSPACE_ID (no files c
     "0" "$(find "$(session_dir)" -type f 2>/dev/null | wc -l | tr -d ' ')"
 drop_sandbox
 
+# --- stub herdr ----------------------------------------------------------
+
+make_stub_herdr() {
+    mkdir -p "$SANDBOX/bin" "$SANDBOX/data"
+    STUB_DATA="$SANDBOX/data"
+    STUB_CALLS="$SANDBOX/calls"
+    : > "$STUB_CALLS"
+    export STUB_DATA STUB_CALLS
+    cat > "$SANDBOX/bin/herdr" <<'STUB'
+#!/bin/sh
+# Test stub for the herdr CLI. Serves canned list JSON from $STUB_DATA and
+# appends every focus call to $STUB_CALLS.
+set -eu
+case "${1:-} ${2:-}" in
+    "tab list") cat "$STUB_DATA/tabs.json" ;;
+    "workspace list") cat "$STUB_DATA/workspaces.json" ;;
+    "tab focus") printf 'tab %s\n' "${3:-}" >> "$STUB_CALLS" ;;
+    "workspace focus") printf 'workspace %s\n' "${3:-}" >> "$STUB_CALLS" ;;
+esac
+STUB
+    chmod +x "$SANDBOX/bin/herdr"
+    HERDR_BIN_PATH="$SANDBOX/bin/herdr"
+    export HERDR_BIN_PATH
+}
+
+# Real Herdr 0.7.5 output shape, single line.
+stub_tabs_two() {
+    printf '%s\n' '{"id":"cli:tab:list","result":{"tabs":[{"agent_status":"working","focused":true,"label":"1","number":1,"pane_count":1,"tab_id":"w5:t1","workspace_id":"w5"},{"agent_status":"unknown","focused":false,"label":"2","number":2,"pane_count":1,"tab_id":"w5:t2","workspace_id":"w5"}],"type":"tab_list"}}' > "$STUB_DATA/tabs.json"
+}
+
+stub_workspaces_two() {
+    printf '%s\n' '{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":[{"active_tab_id":"w5:t1","focused":true,"label":"Herdr","number":1,"workspace_id":"w5"},{"active_tab_id":"w9:t1","focused":false,"label":"Other","number":2,"workspace_id":"w9"}]}}' > "$STUB_DATA/workspaces.json"
+}
+
+# --- live id queries -----------------------------------------------------
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+assert_eq "live_tab_ids extracts tab ids without a JSON parser" \
+    "w5:t1
+w5:t2" "$(live_tab_ids w5)"
+
+stub_workspaces_two
+assert_eq "live_workspace_ids extracts workspace ids only" \
+    "w5
+w9" "$(live_workspace_ids)"
+drop_sandbox
+
+# --- pick_target ---------------------------------------------------------
+
+new_sandbox
+f="$SANDBOX/tabs"
+printf 'w5:t2\nw5:t1\n' > "$f"
+assert_eq "pick_target skips the current id" \
+    "w5:t1" "$(pick_target "$f" "w5:t2" "w5:t1
+w5:t2")"
+
+printf 'w5:t2\nw5:t9\nw5:t1\n' > "$f"
+assert_eq "pick_target skips ids that no longer exist" \
+    "w5:t1" "$(pick_target "$f" "w5:t2" "w5:t1
+w5:t2")"
+
+printf 'w5:t2\n' > "$f"
+assert_eq "pick_target prints nothing when only the current id remains" \
+    "" "$(pick_target "$f" "w5:t2" "w5:t1
+w5:t2")"
+
+printf 'w5:t9\n' > "$f"
+assert_eq "pick_target prints nothing when every candidate is dead" \
+    "" "$(pick_target "$f" "w5:t2" "w5:t1
+w5:t2")"
+
+assert_eq "pick_target prints nothing for a missing file" \
+    "" "$(pick_target "$SANDBOX/absent" "w5:t2" "w5:t1")"
+
+: > "$f"
+assert_eq "pick_target prints nothing for an empty file" \
+    "" "$(pick_target "$f" "w5:t2" "w5:t1")"
+
+printf 'w5:t2\nw5:t1\n' > "$f"
+assert_eq "pick_target still works when the current id is unknown" \
+    "w5:t2" "$(pick_target "$f" "" "w5:t1
+w5:t2")"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
