@@ -275,16 +275,37 @@ all treated as an empty live set. Silent, exit 0.
 
 ## Testing
 
-### `test.sh` survives
+### The suite splits in two
 
 The 62-assertion suite is the highest-value asset in this repository. It is
 hermetic (verified under `dash`, inside a live Herdr session, and against
 hostile ambient environment values), it caught a real bug and two rounds of
-vacuous tests, and it is mutation-checked. None of that is shell-specific: it is
-black-box, driving the real entrypoints against a stub `herdr` binary and
-asserting on files, silence, exit codes, and a stub invocation log.
+vacuous tests, and it is mutation-checked.
 
-It is retargeted, not rewritten:
+It is **not** uniformly black-box, which an earlier draft of this document got
+wrong. `test.sh:47` sources `lib.sh` and then tests its functions directly. The
+assertions divide cleanly:
+
+| Group | Count | Fate |
+|---|---|---|
+| Invoke an entrypoint as a subprocess | 29 | Retargeted, not rewritten |
+| Call a `lib.sh` function directly | 33 | Reimplemented as Rust unit tests |
+
+The 33 cover `MRU_LIMIT`, `herdr_bin`, `session_dir`, `read_mru`,
+`write_atomic`, `record_mru`, `live_tab_ids`, and `pick_target`. Every case
+carries over one-for-one, including the three regression guards that matter
+most: the prefix collision, the regex metacharacter, and the unterminated final
+line. No case is dropped. Totals go from 62 to 67.
+
+`live_tab_ids` cannot be unit-tested against a shell stub from Rust, so
+`herdr.rs` splits into pure `parse_tab_ids` / `parse_workspace_ids` functions
+plus thin spawn wrappers. The parsers carry the logic and are unit-tested; the
+wrappers are covered end-to-end by `test.sh`'s stub binary. This is a better
+boundary regardless of testing.
+
+### The 29 that survive
+
+Retargeted:
 
 ```diff
 -  sh record-tab.sh
@@ -296,13 +317,17 @@ Everything else — the sandbox, the environment scrubbing that unsets
 invocation log — stays as is. The invocation log is what catches guard-removal
 mutations (Task 5, both findings), so it is not optional.
 
+`test.sh` gains its own three-line `session_dir` helper to replace the one it
+was sourcing. Reimplementing it test-side rather than calling into the binary is
+deliberate: it asserts the binary writes where the *spec* says, not merely where
+the binary thinks it should.
+
 `test.sh` runs `cargo build --release` itself before the first assertion, so it
 can never test a stale binary.
 
-This makes the suite a **differential test**: the same assertions that passed
-against the shell implementation must pass against the Rust one. For a port,
-that is exactly the right safety net, and it is the reason the suite is not
-being rewritten in the one change where it is most needed.
+These 29 are a **differential test**: the same assertions that passed against
+the shell implementation must pass against the Rust one. For a port, that is
+exactly the right safety net.
 
 ### Rust unit tests
 
