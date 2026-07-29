@@ -70,9 +70,23 @@ mod tests {
     }
 
     #[test]
-    fn env_id_treats_empty_as_absent() {
+    fn non_empty_treats_empty_as_absent() {
         assert_eq!(non_empty("w5".to_string()), Some("w5".to_string()));
         assert_eq!(non_empty(String::new()), None);
+    }
+
+    // env_id's contract is "unset or empty means absent". Exercised through the
+    // real environment because that is how every caller reaches it. Uses a
+    // dedicated variable name so it cannot collide with the HERDR_* vars the
+    // binary reads.
+    #[test]
+    fn env_id_reads_unset_and_empty_as_absent() {
+        std::env::set_var("HERDR_TEST_ENV_ID", "w5");
+        assert_eq!(env_id("HERDR_TEST_ENV_ID"), Some("w5".to_string()));
+        std::env::set_var("HERDR_TEST_ENV_ID", "");
+        assert_eq!(env_id("HERDR_TEST_ENV_ID"), None);
+        std::env::remove_var("HERDR_TEST_ENV_ID");
+        assert_eq!(env_id("HERDR_TEST_ENV_ID"), None);
     }
 
     #[test]
