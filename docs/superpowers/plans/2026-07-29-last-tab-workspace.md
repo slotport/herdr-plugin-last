@@ -367,7 +367,7 @@ record_mru() {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `19 tests, 0 failures`
+Expected: PASS — `21 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -482,7 +482,7 @@ chmod +x record-tab.sh record-workspace.sh
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `24 tests, 0 failures`
+Expected: PASS — `26 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -659,7 +659,7 @@ pick_target() {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `33 tests, 0 failures`
+Expected: PASS — `35 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -815,7 +815,7 @@ chmod +x jump-tab.sh jump-workspace.sh
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `40 tests, 0 failures`
+Expected: PASS — `42 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -1008,7 +1008,7 @@ directory with a stub `herdr` binary.
 - [ ] **Step 7: Run the full test suite once more**
 
 Run: `./test.sh`
-Expected: PASS — `40 tests, 0 failures`
+Expected: PASS — `42 tests, 0 failures`
 
 - [ ] **Step 8: Commit**
 
