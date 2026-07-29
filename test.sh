@@ -45,6 +45,20 @@ drop_sandbox() {
 
 . "$SCRIPT_DIR/lib.sh"
 
+# --- herdr_bin / MRU_LIMIT ---
+
+assert_eq "MRU_LIMIT is 8" "8" "$MRU_LIMIT"
+
+new_sandbox
+export HERDR_BIN_PATH="/custom/herdr"
+assert_eq "herdr_bin prints HERDR_BIN_PATH when set" \
+    "/custom/herdr" "$(herdr_bin)"
+
+# Test fallback to 'herdr' in a subshell to safely unset HERDR_BIN_PATH under set -u
+assert_eq "herdr_bin falls back to 'herdr' when HERDR_BIN_PATH is unset" \
+    "herdr" "$( ( unset HERDR_BIN_PATH; herdr_bin ) )"
+drop_sandbox
+
 # --- session_dir ---------------------------------------------------------
 
 new_sandbox
