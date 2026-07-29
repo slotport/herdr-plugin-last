@@ -242,13 +242,17 @@ make_stub_herdr() {
     mkdir -p "$SANDBOX/bin" "$SANDBOX/data"
     STUB_DATA="$SANDBOX/data"
     STUB_CALLS="$SANDBOX/calls"
+    STUB_INVOCATIONS="$SANDBOX/invocations"
     : > "$STUB_CALLS"
-    export STUB_DATA STUB_CALLS
+    : > "$STUB_INVOCATIONS"
+    export STUB_DATA STUB_CALLS STUB_INVOCATIONS
     cat > "$SANDBOX/bin/herdr" <<'STUB'
 #!/bin/sh
-# Test stub for the herdr CLI. Serves canned list JSON from $STUB_DATA and
-# appends every focus call to $STUB_CALLS.
+# Test stub for the herdr CLI. Serves canned list JSON from $STUB_DATA,
+# appends every focus call to $STUB_CALLS, and logs every invocation
+# (including list calls) to $STUB_INVOCATIONS.
 set -eu
+printf '%s\n' "$*" >> "$STUB_INVOCATIONS"
 case "${1:-} ${2:-}" in
     "tab list") cat "$STUB_DATA/tabs.json" ;;
     "workspace list") cat "$STUB_DATA/workspaces.json" ;;
@@ -378,6 +382,8 @@ printf 'w5:t2\nw5:t1\n' > "$(session_dir)/tabs/w5"
 HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/jump-tab.sh"
 assert_eq "jump-tab.sh issues no call without HERDR_WORKSPACE_ID" \
     "" "$(cat "$STUB_CALLS")"
+assert_eq "jump-tab.sh invokes herdr zero times without HERDR_WORKSPACE_ID" \
+    "" "$(cat "$STUB_INVOCATIONS")"
 drop_sandbox
 
 new_sandbox
@@ -388,6 +394,16 @@ printf 'w5\nw9\n' > "$(session_dir)/workspaces"
 HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/jump-workspace.sh"
 assert_eq "jump-workspace.sh focuses the last live workspace" \
     "workspace w9" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+make_stub_herdr
+stub_workspaces_two
+mkdir -p "$(session_dir)"
+printf 'w5\nw77\n' > "$(session_dir)/workspaces"
+HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/jump-workspace.sh"
+assert_eq "jump-workspace.sh issues no call when every candidate is dead" \
+    "" "$(cat "$STUB_CALLS")"
 drop_sandbox
 
 # Toggle: drive record between jumps the way Herdr's focus events would, and
