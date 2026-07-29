@@ -146,13 +146,29 @@ mod tests {
         assert_eq!(parse_tab_ids(hostile), vec!["w5:t1"]);
     }
 
+    /// Restores an environment variable when dropped, so a test cannot leave the
+    /// process environment mutated — including when an assertion panics and
+    /// unwinds past the end of the test body. `cargo test` runs tests as threads
+    /// in one process, so a dirty variable would make sibling failures hard to
+    /// attribute.
+    struct RestoreEnv(&'static str, Option<String>);
+
+    impl Drop for RestoreEnv {
+        fn drop(&mut self) {
+            match self.1.take() {
+                Some(value) => std::env::set_var(self.0, value),
+                None => std::env::remove_var(self.0),
+            }
+        }
+    }
+
     // herdr_bin's fallback is what keeps the binary runnable by hand outside a
     // Herdr session. Exercised through the real environment because that is how
     // callers reach it, and with a save/restore so it cannot disturb the
     // HERDR_BIN_PATH that other tests in this binary may rely on.
     #[test]
     fn herdr_bin_falls_back_when_path_is_unset_or_empty() {
-        let saved = std::env::var("HERDR_BIN_PATH").ok();
+        let _restore = RestoreEnv("HERDR_BIN_PATH", std::env::var("HERDR_BIN_PATH").ok());
 
         std::env::set_var("HERDR_BIN_PATH", "/custom/herdr");
         assert_eq!(herdr_bin(), "/custom/herdr");
@@ -162,10 +178,27 @@ mod tests {
 
         std::env::remove_var("HERDR_BIN_PATH");
         assert_eq!(herdr_bin(), "herdr");
+    }
 
-        match saved {
-            Some(value) => std::env::set_var("HERDR_BIN_PATH", value),
-            None => std::env::remove_var("HERDR_BIN_PATH"),
-        }
+    #[test]
+    fn restore_env_guard_actually_restores_on_panic() {
+        let original = std::env::var("HERDR_BIN_PATH").ok();
+
+        // Simulate a test that panics while holding the guard
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _restore = RestoreEnv("HERDR_BIN_PATH", std::env::var("HERDR_BIN_PATH").ok());
+            std::env::set_var("HERDR_BIN_PATH", "/test/value");
+            panic!("deliberate panic to test guard restoration");
+        }));
+
+        // The panic should have occurred
+        assert!(result.is_err());
+
+        // After the panic, the guard should have restored the original value
+        let restored = std::env::var("HERDR_BIN_PATH").ok();
+        assert_eq!(
+            original, restored,
+            "guard did not restore environment on panic"
+        );
     }
 }
