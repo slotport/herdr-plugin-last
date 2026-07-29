@@ -117,6 +117,8 @@ mod tests {
     fn an_error_envelope_yields_no_ids() {
         assert!(parse_tab_ids(ERROR).is_empty());
         assert!(parse_workspace_ids(ERROR).is_empty());
+        // "result": null present-but-null is the shape only Option<T> accepts.
+        assert!(parse_tab_ids(r#"{"id":"x","result":null}"#).is_empty());
     }
 
     #[test]
@@ -142,5 +144,28 @@ mod tests {
         let hostile =
             r#"{"result":{"tabs":[{"label":"hello,\"tab_id\":\"w9:t9","tab_id":"w5:t1"}]}}"#;
         assert_eq!(parse_tab_ids(hostile), vec!["w5:t1"]);
+    }
+
+    // herdr_bin's fallback is what keeps the binary runnable by hand outside a
+    // Herdr session. Exercised through the real environment because that is how
+    // callers reach it, and with a save/restore so it cannot disturb the
+    // HERDR_BIN_PATH that other tests in this binary may rely on.
+    #[test]
+    fn herdr_bin_falls_back_when_path_is_unset_or_empty() {
+        let saved = std::env::var("HERDR_BIN_PATH").ok();
+
+        std::env::set_var("HERDR_BIN_PATH", "/custom/herdr");
+        assert_eq!(herdr_bin(), "/custom/herdr");
+
+        std::env::set_var("HERDR_BIN_PATH", "");
+        assert_eq!(herdr_bin(), "herdr");
+
+        std::env::remove_var("HERDR_BIN_PATH");
+        assert_eq!(herdr_bin(), "herdr");
+
+        match saved {
+            Some(value) => std::env::set_var("HERDR_BIN_PATH", value),
+            None => std::env::remove_var("HERDR_BIN_PATH"),
+        }
     }
 }
