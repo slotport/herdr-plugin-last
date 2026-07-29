@@ -193,6 +193,38 @@ assert_eq "grep -vxF uses literal strings; w5:t1X2 survives when w5:t1.2 is re-r
 w5:t1X2" "$(cat "$f")"
 drop_sandbox
 
+# --- record entrypoints --------------------------------------------------
+
+new_sandbox
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" sh "$SCRIPT_DIR/record-tab.sh"
+HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" sh "$SCRIPT_DIR/record-tab.sh"
+assert_eq "record-tab.sh records into the workspace's tab file" \
+    "w5:t2
+w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+
+HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/record-tab.sh"
+assert_eq "record-tab.sh is a no-op without HERDR_TAB_ID" \
+    "w5:t2
+w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+
+HERDR_TAB_ID="w9:t1" sh "$SCRIPT_DIR/record-tab.sh"
+assert_eq "record-tab.sh is a no-op without HERDR_WORKSPACE_ID" \
+    "0" "$(find "$(session_dir)/tabs" -name 'w9' | wc -l | tr -d ' ')"
+drop_sandbox
+
+new_sandbox
+HERDR_WORKSPACE_ID="w5" sh "$SCRIPT_DIR/record-workspace.sh"
+HERDR_WORKSPACE_ID="w9" sh "$SCRIPT_DIR/record-workspace.sh"
+assert_eq "record-workspace.sh records into the workspaces file" \
+    "w9
+w5" "$(cat "$(session_dir)/workspaces")"
+
+sh "$SCRIPT_DIR/record-workspace.sh"
+assert_eq "record-workspace.sh is a no-op without HERDR_WORKSPACE_ID" \
+    "w9
+w5" "$(cat "$(session_dir)/workspaces")"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
