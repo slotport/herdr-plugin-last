@@ -230,7 +230,15 @@ write_atomic() {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `7 tests, 0 failures`
+Expected: PASS — `10 tests, 0 failures`
+
+> **Post-review amendment.** The Step 1 block above yields 7 assertions. Review
+> found that `MRU_LIMIT` and `herdr_bin()` — both listed under "Produces" — had
+> no coverage, proven by mutation: setting `MRU_LIMIT=99` still gave a green
+> suite. A fix round added three assertions (`MRU_LIMIT` is 8; `herdr_bin()`
+> honours `$HERDR_BIN_PATH`; `herdr_bin()` falls back to `herdr`) in a section
+> before `# --- session_dir ---`. Every later task's cumulative count includes
+> those three.
 
 - [ ] **Step 5: Commit**
 
@@ -359,7 +367,7 @@ record_mru() {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `16 tests, 0 failures`
+Expected: PASS — `19 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -474,7 +482,7 @@ chmod +x record-tab.sh record-workspace.sh
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `21 tests, 0 failures`
+Expected: PASS — `24 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -651,7 +659,7 @@ pick_target() {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `30 tests, 0 failures`
+Expected: PASS — `33 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -807,7 +815,7 @@ chmod +x jump-tab.sh jump-workspace.sh
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `./test.sh`
-Expected: PASS — `37 tests, 0 failures`
+Expected: PASS — `40 tests, 0 failures`
 
 - [ ] **Step 5: Commit**
 
@@ -1000,7 +1008,7 @@ directory with a stub `herdr` binary.
 - [ ] **Step 7: Run the full test suite once more**
 
 Run: `./test.sh`
-Expected: PASS — `37 tests, 0 failures`
+Expected: PASS — `40 tests, 0 failures`
 
 - [ ] **Step 8: Commit**
 
