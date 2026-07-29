@@ -37,3 +37,22 @@ write_atomic() {
     cat > "$_tmp"
     mv "$_tmp" "$_path"
 }
+
+# Move an id to the front of an MRU file, deduplicating and capping the list.
+#
+#   record_mru <path> <id>
+#
+# A blank id is ignored so a missing HERDR_TAB_ID cannot truncate the history.
+record_mru() {
+    _path=$1
+    _id=$2
+    if [ -z "$_id" ]; then
+        return 0
+    fi
+    _rest=$(read_mru "$_path" | grep -vxF "$_id" || true)
+    if [ -n "$_rest" ]; then
+        printf '%s\n%s\n' "$_id" "$_rest" | head -n "$MRU_LIMIT" | write_atomic "$_path"
+    else
+        printf '%s\n' "$_id" | write_atomic "$_path"
+    fi
+}

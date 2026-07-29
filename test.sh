@@ -106,6 +106,73 @@ assert_eq "write_atomic leaves no temp files behind" \
     "0" "$(find "$SANDBOX/deep/nested" -name '.tmp.*' | wc -l | tr -d ' ')"
 drop_sandbox
 
+# --- record_mru ----------------------------------------------------------
+
+new_sandbox
+f="$SANDBOX/tabs"
+
+record_mru "$f" "w5:t1"
+record_mru "$f" "w5:t2"
+record_mru "$f" "w5:t3"
+assert_eq "record_mru keeps most-recent-first order" \
+    "w5:t3
+w5:t2
+w5:t1" "$(cat "$f")"
+
+record_mru "$f" "w5:t1"
+assert_eq "record_mru moves a repeat to the front without duplicating" \
+    "w5:t1
+w5:t3
+w5:t2" "$(cat "$f")"
+
+record_mru "$f" ""
+assert_eq "record_mru ignores an empty id" \
+    "w5:t1
+w5:t3
+w5:t2" "$(cat "$f")"
+drop_sandbox
+
+new_sandbox
+f="$SANDBOX/capped"
+i=1
+while [ "$i" -le 12 ]; do
+    record_mru "$f" "w5:t$i"
+    i=$((i + 1))
+done
+assert_eq "record_mru caps the file at MRU_LIMIT lines" \
+    "8" "$(wc -l < "$f" | tr -d ' ')"
+assert_eq "record_mru drops the oldest entries when capping" \
+    "w5:t12
+w5:t11
+w5:t10
+w5:t9
+w5:t8
+w5:t7
+w5:t6
+w5:t5" "$(cat "$f")"
+drop_sandbox
+
+new_sandbox
+record_mru "$(session_dir)/tabs/w5" "w5:t1"
+record_mru "$(session_dir)/tabs/w9" "w9:t1"
+assert_eq "record_mru keeps workspaces separate (w5)" \
+    "w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+assert_eq "record_mru keeps workspaces separate (w9)" \
+    "w9:t1" "$(cat "$(session_dir)/tabs/w9")"
+drop_sandbox
+
+new_sandbox
+HERDR_SOCKET_PATH="/home/test/.config/herdr/herdr.sock"
+record_mru "$(session_dir)/tabs/w5" "w5:t1"
+HERDR_SOCKET_PATH="/home/test/.config/herdr/sessions/work/herdr.sock"
+record_mru "$(session_dir)/tabs/w5" "w5:t7"
+assert_eq "record_mru keeps concurrent sessions separate" \
+    "w5:t7" "$(cat "$(session_dir)/tabs/w5")"
+HERDR_SOCKET_PATH="/home/test/.config/herdr/herdr.sock"
+assert_eq "record_mru leaves the other session's history intact" \
+    "w5:t1" "$(cat "$(session_dir)/tabs/w5")"
+drop_sandbox
+
 # --- summary -------------------------------------------------------------
 
 printf '\n%s tests, %s failures\n' "$TESTS" "$FAILURES"
