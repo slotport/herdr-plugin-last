@@ -220,10 +220,22 @@ drop_sandbox
 # leak into later tests under this suite's own "set -u". Nothing here asserts
 # on an absolute path like /tabs; only exit status, output, and the sandbox's
 # own contents are checked, so this test cannot touch the real filesystem root.
+#
+# Each subshell also `cd`s into the sandbox before running the binary. The
+# guard must prevent writes anywhere, not merely inside a configured state
+# dir: a plausible regression is `from_env` falling back to a relative empty
+# path instead of returning None, which would write under the process's
+# current working directory rather than under $SANDBOX. In production that
+# CWD is the plugin's install directory, so an unguarded relative write would
+# quietly litter it on every focus event. Running from the sandbox is what
+# makes that kind of write land where the existing "creates no file"
+# assertion below already looks, rather than silently escaping it. $BIN is an
+# absolute path (built from $SCRIPT_DIR), so the `cd` cannot break the
+# invocation.
 
 new_sandbox
 status=0
-out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" record-tab) 2>&1) || status=$?
+out=$( (cd "$SANDBOX" && unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" record-tab) 2>&1) || status=$?
 assert_eq "record-tab exits 0 without HERDR_PLUGIN_STATE_DIR" \
     "0" "$status"
 assert_eq "record-tab is silent without HERDR_PLUGIN_STATE_DIR" \
@@ -234,7 +246,7 @@ drop_sandbox
 
 new_sandbox
 status=0
-out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" "$BIN" record-workspace) 2>&1) || status=$?
+out=$( (cd "$SANDBOX" && unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" "$BIN" record-workspace) 2>&1) || status=$?
 assert_eq "record-workspace exits 0 without HERDR_PLUGIN_STATE_DIR" \
     "0" "$status"
 assert_eq "record-workspace is silent without HERDR_PLUGIN_STATE_DIR" \
@@ -245,7 +257,7 @@ drop_sandbox
 
 new_sandbox
 status=0
-out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" jump-tab) 2>&1) || status=$?
+out=$( (cd "$SANDBOX" && unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" jump-tab) 2>&1) || status=$?
 assert_eq "jump-tab exits 0 without HERDR_PLUGIN_STATE_DIR" \
     "0" "$status"
 assert_eq "jump-tab is silent without HERDR_PLUGIN_STATE_DIR" \
@@ -256,7 +268,7 @@ drop_sandbox
 
 new_sandbox
 status=0
-out=$( (unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" "$BIN" jump-workspace) 2>&1) || status=$?
+out=$( (cd "$SANDBOX" && unset HERDR_PLUGIN_STATE_DIR; HERDR_WORKSPACE_ID="w5" "$BIN" jump-workspace) 2>&1) || status=$?
 assert_eq "jump-workspace exits 0 without HERDR_PLUGIN_STATE_DIR" \
     "0" "$status"
 assert_eq "jump-workspace is silent without HERDR_PLUGIN_STATE_DIR" \
