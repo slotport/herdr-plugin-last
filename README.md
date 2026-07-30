@@ -95,21 +95,28 @@ Two details are load-bearing and deliberately not simplified:
 
 ```bash
 cargo build --release && herdr plugin link "$PWD"
-cargo test && ./test.sh
+cargo test
 ```
 
 `herdr plugin link` does **not** run manifest build commands, so a linked plugin
-happily keeps running a stale binary until you rebuild. `test.sh` builds before
-asserting anything for exactly this reason.
+happily keeps running a stale binary until you rebuild. Rebuild before linking,
+and after any change you want the live session to pick up.
 
-`cargo test` runs 43 tests covering the pure logic: MRU ordering and capping,
-target selection, and CLI response parsing. `test.sh` runs 37 assertions
-covering what unit tests cannot reach — exit codes, silence, and which `herdr`
-calls each entrypoint actually issues. Beyond a POSIX shell and a Rust
-toolchain (`test.sh` invokes `cargo build --release` itself, see above), it
-needs nothing — no jq, no node, no test framework. It runs the real binary
-against a temporary state directory with a stub `herdr`, and is hermetic: it
-passes identically inside a Herdr session and outside one.
+`cargo test` runs everything — 43 unit tests and 20 integration tests.
+
+The unit tests in `src/` cover the pure logic: MRU ordering and capping, target
+selection, and CLI response parsing. The integration tests in `tests/cli.rs`
+cover what unit tests cannot reach, because they spawn the real binary: argv
+dispatch, exit codes, silence on every path, and which `herdr` calls each
+entrypoint actually issues. Nothing else verifies that `main.rs` wires the
+modules together correctly.
+
+They run the binary against a temporary state directory with a stub `herdr`,
+and they are hermetic by construction: each child process starts from
+`env_clear()` with only the variables that test needs, so ambient `HERDR_*`
+values from a live Herdr session cannot leak in and quietly satisfy a guard
+that was supposed to fire. That also makes them parallel-safe with no locking,
+since they never touch the parent process's environment.
 
 Three defects the shell version had to fix by hand are structurally impossible
 in the port: dropping an MRU file's final entry when it lacks a trailing
