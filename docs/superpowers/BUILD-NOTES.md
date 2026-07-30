@@ -87,9 +87,19 @@ Tasks:
 6. Documentation (this entry) — README + this section only; live verification
    handled separately, see below.
 
-Final counts: `cargo test` 42 passed / 0 failed. `./test.sh` 33 assertions, 0
-failures (29 retargeted from the shell suite + 4 new, covering the record/jump
-exit asymmetry). `cargo clippy --all-targets -- -D warnings` clean.
+Counts at the end of Task 5, before the final review: `cargo test` 42 passed,
+`./test.sh` 33 assertions (29 retargeted from the shell suite + 4 new, covering
+the record/jump exit asymmetry).
+
+FINAL COUNTS for the branch, after the final review's fix wave (commit
+abb0703): `cargo test` **43** passed / 0 failed. `./test.sh` **37** assertions,
+0 failures. `cargo clippy --all-targets -- -D warnings` clean. The wave added
+one Rust test (the atomic write's temp file must be created in the destination
+directory) and four shell assertions (silence on a successful jump and a
+successful record, each paired with a "still did the thing" check so a binary
+that silently did nothing could not pass).
+
+Coverage went from the shell suite's 62 assertions to 80.
 
 ## PLAN-MANDATED FINDING, escalated to the user (Task 1)
 
@@ -241,14 +251,35 @@ function is actually invoked. Read what a test calls, not what it's named.
   typical one, so a slow or stalled-looking build under load isn't mistaken
   for a hang.
 
-## Live verification
+## Live verification — NOT PERFORMED ON THIS BRANCH
 
-NOT DONE as of this entry. Task 6's brief calls for linking the plugin into a
-real Herdr session, running `herdr server reload-config`, and confirming both
-keybindings by hand — including the closed-target degradation case and the
-exact `~/.local/state/herdr/plugins/...` path. That step needs a person at the
-keyboard and mutates the user's live terminal session, so it is being done by
-the controller directly with the user, separately from this documentation
-pass. This section and the README updates cover documentation only; their
-presence is not evidence the port has been confirmed working in a real
-session.
+Read this before assuming the port is proven. The shell build's Task 6 entry
+above (line 51) records a live pass that genuinely happened, with plugin-log
+exit codes and real recorded state paths. **This branch has no equivalent.**
+
+The plan's verification bar has four criteria. Three are met:
+
+1. `cargo test` — 43 passed, 0 failed ✅
+2. `./test.sh` — 37 assertions, 0 failures ✅
+3. `cargo clippy --all-targets -- -D warnings` — clean ✅
+4. Both keybindings confirmed by hand in a real Herdr session — **NOT DONE** ❌
+
+The plugin was never linked into a running session on this branch,
+`herdr server reload-config` was never run, and no key was ever pressed. The
+user elected to run the live pass themselves rather than have the controller
+touch their live terminal session; it had not been reported back when this was
+written.
+
+The specific claim no test in this repository can establish: the manifest's
+`command` arrays use the **relative** path `./target/release/last`, and nothing
+here proves it resolves at runtime. The evidence for it is that Herdr spawns
+plugin commands with `current_dir(plugin_root)`
+(`src/app/api/plugins/runtime.rs:123`), read directly in Herdr's source. That
+is a strong reason to expect it to work. It is not a demonstration that it
+does.
+
+Calibrated statement of confidence: the suites are green, the `[[build]]` key
+and the install-time build path were verified against Herdr's own source rather
+than assumed, and the CLI subcommand spelling was checked against the real
+0.7.5 binary. High confidence, not demonstrated. Anyone merging this should
+either run the live pass or record explicitly that they chose not to.
