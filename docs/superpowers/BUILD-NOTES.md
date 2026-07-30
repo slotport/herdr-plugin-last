@@ -81,7 +81,9 @@ Tasks:
 2. mru.rs — read, atomic write, record — commit c04b7f3
 3. mru.rs — pick_target — commit 5f76b81
 4. herdr.rs — CLI client — commits fb45a6f, 90ba54f, e9a402a (fix rounds)
-5. main.rs, manifest, retargeted test.sh — commits ba2b4b2, 33c09ca (fix round)
+5. main.rs, manifest, retargeted test.sh — commits ba2b4b2, 33c09ca (fix
+   round), eae8b82 (second fix round: `cd "$SANDBOX"` added to all four
+   HERDR_PLUGIN_STATE_DIR guard blocks — see the S4/S4b correction below)
 6. Documentation (this entry) — README + this section only; live verification
    handled separately, see below.
 
@@ -128,15 +130,46 @@ function is actually invoked. Read what a test calls, not what it's named.
   reviewer additionally confirmed the asymmetry is enforced at the type level
   (record_* returns `io::Result`, jump_* returns `()` with no way to
   propagate failure even deliberately), not just by convention.
-- NON-GAP, ruled (Task 5, mutation S4): `record_*` replacing its state-dir
-  guard with a fallback `Context` also went uncaught, but is not a real gap.
-  The mutation had to invent a fallback Context — the accidental form
-  (forgetting the guard) cannot even be written, because `let ... else`
-  requires a diverging else branch. Separately, the guard tests deliberately
-  assert only on sandbox contents, never on an absolute path like `/tabs`,
-  inherited from the shell suite's own comment that tests must not risk
-  touching the real filesystem root. Flagged to final review rather than
-  looped on.
+- *** CORRECTION: RULING OVERTURNED (final review) ***. This entry originally
+  read: "NON-GAP, ruled (Task 5, mutation S4): `record_*` replacing its
+  state-dir guard with a fallback `Context` also went uncaught, but is not a
+  real gap. The mutation had to invent a fallback Context — the accidental
+  form (forgetting the guard) cannot even be written, because `let ... else`
+  requires a diverging else branch. [...] Flagged to final review rather than
+  looped on."
+  THAT RULING WAS WRONG, and was disproven during the final review's own
+  execution, not merely argued against. The guard does not live only at the
+  call sites in `main.rs`, where `let ... else` genuinely does force a
+  diverging branch — it also lives inside `Context::from_env`, where
+  replacing the `?` with `.unwrap_or_default()` is an ordinary refactor, not
+  a contrivance:
+
+      -  let state_dir = env_id("HERDR_PLUGIN_STATE_DIR")?;
+      +  let state_dir = env_id("HERDR_PLUGIN_STATE_DIR").unwrap_or_default();
+
+  Mutation S4b, measured: NOT CAUGHT. All 33 assertions still passed, and the
+  binary wrote a stray `_home_test_.config_herdr_herdr.sock/` tree into the
+  process's current working directory. In production that CWD is
+  `plugin_root`, so an unfixed regression here would litter the plugin's own
+  install directory on every focus event — a real, production-visible defect
+  that the original ruling declared unwritable.
+  WHY THE ORIGINAL RULING MISSED IT: it generalised from "the call sites in
+  main.rs are protected by let-else" to "the guard is structurally enforced,"
+  without trying the accidental form one layer deeper, inside `from_env`
+  itself — the more natural place someone would actually "simplify" the `?`.
+  FIX (commit eae8b82): all four `HERDR_PLUGIN_STATE_DIR` guard blocks in
+  `test.sh` now run the binary with `cd "$SANDBOX"` first, so a relative-path
+  write lands where the existing "creates no file" assertions already look
+  instead of escaping them. This strengthens the 4 existing blocks rather
+  than adding new ones — the assertion count is unchanged at 33. Reverting
+  the fix reproduces exactly 2 failures (the record-side "creates no file"
+  assertions; the jump-side pair stays green because the jump paths never
+  write), confirming the fix closes precisely the gap S4b found.
+  LESSON: this is the same failure mode this file's own Task 1 LESSON already
+  named, and it recurred in the very branch that LESSON was written on. Ruling
+  a mutation "contrived" because you could only think of a contrived version
+  of it is not verification. A deferred or adjudicated finding stays unverified
+  until the specific accidental form has actually been tried.
 
 ## Controller errors this ledger records
 
@@ -167,15 +200,31 @@ function is actually invoked. Read what a test calls, not what it's named.
 
 ## Deferred minors (not merge-blocking; for a future reader to triage)
 
-- write_atomic's temp file is created via `NamedTempFile::new_in(dir)`, but no
-  test asserts it lands specifically inside the destination directory rather
-  than system tmp (Task 2). On macOS both currently share a filesystem, so a
-  regression to `NamedTempFile::new()` would still pass every current test.
+- RESOLVED (final fix wave, src/mru.rs): write_atomic's temp file is created
+  via `NamedTempFile::new_in(dir)`, but until now no test asserted it lands
+  specifically inside the destination directory rather than system tmp
+  (Task 2). On macOS both currently share a filesystem, so a regression to
+  `NamedTempFile::new()` would still have passed every prior test.
+  `record_creates_its_temp_file_in_the_destination_directory` now points
+  `TMPDIR` at a nonexistent path for the duration of one `record()` call,
+  which only `NamedTempFile::new()` would consult and fail on. Discovered
+  while adding it: `TMPDIR` is process-global, so this races every other
+  test's `sandbox()` helper (which creates its tempdir via `TMPDIR` too) if
+  run concurrently — not just tests that call `set_var`/`remove_var`
+  directly, which is what `ENV_LOCK` was originally scoped to. Fixed by
+  having `sandbox()` itself take `ENV_LOCK` briefly.
 - write_atomic's "path has no parent" branch (reachable via
   `record(Path::new("/"), id)`) is untested (Task 2).
-- `pick_target`'s correctness for `current == ""` depends on `read()`
-  filtering blank lines — an implicit, documented-but-not-compiler-checked
-  cross-function contract (Task 3).
+- *** CORRECTION ***: this entry originally read: "`pick_target`'s correctness
+  for `current == ""` depends on `read()` filtering blank lines — an implicit,
+  documented-but-not-compiler-checked cross-function contract (Task 3)." That
+  had it backwards. `pick_target` is safe either way, independent of whether
+  `read()` filters blank lines: with `current == ""` a blank id is dropped by
+  the `id != current` comparison; with `current != ""` a blank id is dropped
+  by live-set membership, since `live` comes from Herdr and never contains
+  `""`. `read()`'s blank-line filter earns its keep in `record`, not in
+  `pick_target` — a blank line there would otherwise consume an MRU slot
+  (Task 3).
 - src/mru.rs is ~360 lines holding read/record/write_atomic/pick_target plus
   28 colocated tests. Plan-mandated placement, not an implementer choice;
   worth watching if more selection logic accretes (Task 3).
@@ -183,6 +232,14 @@ function is actually invoked. Read what a test calls, not what it's named.
   controller's own via `git add -A` — content was legitimate (test-count
   corrections belonging on this branch) but bundled into the wrong commit.
   Not worth rewriting history; recorded so it isn't a surprise later.
+- Build-time variance, observed but not previously recorded here: three clean
+  cold-build measurements clustered at 5.3-8.6s, but a build under concurrent
+  load (a second cargo invocation contending for the machine) was observed to
+  take up to 42s, and a separate final-review run stalled for close to 10
+  minutes under similar contention before completing successfully. The
+  README's build-time line is worded to reflect the worst case, not the
+  typical one, so a slow or stalled-looking build under load isn't mistaken
+  for a hang.
 
 ## Live verification
 

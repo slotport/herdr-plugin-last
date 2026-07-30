@@ -71,7 +71,16 @@ mod tests {
     use super::*;
     use std::fs;
 
+    // Creating a tempdir consults TMPDIR, so this briefly takes the shared
+    // ENV_LOCK too: record_creates_its_temp_file_in_the_destination_directory
+    // mutates TMPDIR process-wide for its duration, and every other test's
+    // sandbox() call would otherwise race that mutation (observed directly:
+    // without this, concurrent sandbox() calls failed with ENOENT against the
+    // deliberately-broken TMPDIR). Callers that already hold ENV_LOCK
+    // themselves must call sandbox() before acquiring it, since this Mutex is
+    // not reentrant.
     fn sandbox() -> tempfile::TempDir {
+        let _env = crate::context::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         tempfile::tempdir().expect("create sandbox")
     }
 
@@ -128,6 +137,32 @@ mod tests {
         record(&path, "two").unwrap();
         let entries: Vec<_> = fs::read_dir(dir.path()).unwrap().collect();
         assert_eq!(entries.len(), 1);
+    }
+
+    // The temp file must be created in the DESTINATION directory so the rename
+    // stays on one filesystem. Regressing to NamedTempFile::new() would still
+    // pass every other test, because on macOS the sandbox and the system temp
+    // dir happen to share a filesystem. Pointing TMPDIR somewhere nonexistent
+    // makes the two cases distinguishable.
+    #[test]
+    fn record_creates_its_temp_file_in_the_destination_directory() {
+        // sandbox() takes ENV_LOCK itself (see its comment), so it must run
+        // before we take the lock here — std::sync::Mutex is not reentrant.
+        let dir = sandbox();
+        let _env = crate::context::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let saved = std::env::var("TMPDIR").ok();
+        std::env::set_var("TMPDIR", dir.path().join("definitely-not-here"));
+
+        let path = dir.path().join("tabs/w5");
+        let result = record(&path, "w5:t1");
+
+        match saved {
+            Some(value) => std::env::set_var("TMPDIR", value),
+            None => std::env::remove_var("TMPDIR"),
+        }
+
+        assert!(result.is_ok(), "record should not depend on TMPDIR: {result:?}");
+        assert_eq!(read(&path), vec!["w5:t1"]);
     }
 
     #[test]

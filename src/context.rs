@@ -48,6 +48,12 @@ fn non_empty(value: String) -> Option<String> {
     if value.is_empty() { None } else { Some(value) }
 }
 
+/// Serialises tests that mutate the process environment. `cargo test` runs
+/// tests as threads in one process, so concurrent set_var/getenv is both a
+/// logical race between tests and an actual data race inside libc.
+#[cfg(test)]
+pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,6 +87,7 @@ mod tests {
     // binary reads.
     #[test]
     fn env_id_reads_unset_and_empty_as_absent() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::set_var("HERDR_TEST_ENV_ID", "w5");
         assert_eq!(env_id("HERDR_TEST_ENV_ID"), Some("w5".to_string()));
         std::env::set_var("HERDR_TEST_ENV_ID", "");

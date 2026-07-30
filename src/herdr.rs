@@ -168,6 +168,7 @@ mod tests {
     // HERDR_BIN_PATH that other tests in this binary may rely on.
     #[test]
     fn herdr_bin_falls_back_when_path_is_unset_or_empty() {
+        let _env = crate::context::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let _restore = RestoreEnv("HERDR_BIN_PATH", std::env::var("HERDR_BIN_PATH").ok());
 
         std::env::set_var("HERDR_BIN_PATH", "/custom/herdr");
@@ -182,6 +183,7 @@ mod tests {
 
     #[test]
     fn restore_env_guard_actually_restores_on_panic() {
+        let _env = crate::context::ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let original = std::env::var("HERDR_BIN_PATH").ok();
 
         // Simulate a test that panics while holding the guard

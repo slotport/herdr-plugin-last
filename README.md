@@ -13,7 +13,8 @@ Herdr 0.7.5+, Linux or macOS, and a Rust toolchain.
 
 `herdr plugin install` compiles the plugin from source. Herdr captures build
 output and only shows it on failure, so install looks like it has hung for the
-duration of the build — around 10 seconds cold.
+duration of the build — usually under 10 seconds cold, longer on a loaded
+machine.
 
 ## Install
 
@@ -101,8 +102,8 @@ cargo test && ./test.sh
 happily keeps running a stale binary until you rebuild. `test.sh` builds before
 asserting anything for exactly this reason.
 
-`cargo test` runs 42 tests covering the pure logic: MRU ordering and capping,
-target selection, and CLI response parsing. `test.sh` runs 33 assertions
+`cargo test` runs 43 tests covering the pure logic: MRU ordering and capping,
+target selection, and CLI response parsing. `test.sh` runs 37 assertions
 covering what unit tests cannot reach — exit codes, silence, and which `herdr`
 calls each entrypoint actually issues. Beyond a POSIX shell and a Rust
 toolchain (`test.sh` invokes `cargo build --release` itself, see above), it

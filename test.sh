@@ -126,8 +126,8 @@ printf '%s\n' "$*" >> "$STUB_INVOCATIONS"
 case "${1:-} ${2:-}" in
     "tab list") cat "$STUB_DATA/tabs.json" ;;
     "workspace list") cat "$STUB_DATA/workspaces.json" ;;
-    "tab focus") printf 'tab %s\n' "${3:-}" >> "$STUB_CALLS" ;;
-    "workspace focus") printf 'workspace %s\n' "${3:-}" >> "$STUB_CALLS" ;;
+    "tab focus") printf 'tab %s\n' "${3:-}" >> "$STUB_CALLS"; printf 'stub-stdout-noise\n'; printf 'stub-stderr-noise\n' >&2 ;;
+    "workspace focus") printf 'workspace %s\n' "${3:-}" >> "$STUB_CALLS"; printf 'stub-stdout-noise\n'; printf 'stub-stderr-noise\n' >&2 ;;
 esac
 STUB
     chmod +x "$SANDBOX/bin/herdr"
@@ -328,6 +328,30 @@ status=0
 out=$(HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" jump-tab 2>&1) || status=$?
 assert_eq "jump-tab exits 0 when the state path is unusable" "0" "$status"
 assert_eq "jump-tab stays silent when the state path is unusable" "" "$out"
+drop_sandbox
+
+# --- success-path silence --------------------------------------------------
+#
+# The binding constraint is silence on EVERY guard and success path, but every
+# other captured invocation in this file reaches a guard or the record-failure
+# path. Without these two, switching herdr.rs's .output() to .status() would
+# inherit the CLI's stdout — and a real `herdr tab focus` prints a JSON
+# envelope, so it would leak into the user's terminal — with nothing going red.
+
+new_sandbox
+make_stub_herdr
+stub_tabs_two
+mkdir -p "$(session_dir)/tabs"
+printf 'w5:t2\nw5:t1\n' > "$(session_dir)/tabs/w5"
+out=$(HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t2" "$BIN" jump-tab 2>&1)
+assert_eq "jump-tab is silent on a successful jump" "" "$out"
+assert_eq "jump-tab still focused the target" "tab w5:t1" "$(cat "$STUB_CALLS")"
+drop_sandbox
+
+new_sandbox
+out=$(HERDR_WORKSPACE_ID="w5" HERDR_TAB_ID="w5:t1" "$BIN" record-tab 2>&1)
+assert_eq "record-tab is silent on a successful record" "" "$out"
+assert_eq "record-tab still wrote the entry" "w5:t1" "$(cat "$(session_dir)/tabs/w5")"
 drop_sandbox
 
 # --- summary -------------------------------------------------------------
