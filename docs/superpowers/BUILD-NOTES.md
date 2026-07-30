@@ -283,3 +283,14 @@ and the install-time build path were verified against Herdr's own source rather
 than assumed, and the CLI subcommand spelling was checked against the real
 0.7.5 binary. High confidence, not demonstrated. Anyone merging this should
 either run the live pass or record explicitly that they chose not to.
+
+DECISION (2026-07-30): the user was offered both options — run the live pass
+first, or merge with it outstanding — and explicitly chose to merge without it.
+This is that record. The branch was merged with criterion 4 unmet, knowingly.
+
+First thing to do if the plugin misbehaves after install: check whether
+`./target/release/last` resolved at all. `herdr plugin list --json` should show
+version 0.2.0 with both actions registered, and the plugin log should show
+`exit_code 0` for the `tab.focused` hook. If the log shows a spawn failure
+instead, the relative path is the prime suspect and an absolute path in
+`herdr-plugin.toml` is the fix.
