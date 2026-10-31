@@ -1,6 +1,6 @@
-id = "m4salah.last"
+id = "slotport.last"
 name = "Last"
-version = "0.2.0"
+version = "0.2.0-1"
 min_herdr_version = "0.7.5"
 description = "tmux-style last-tab and last-workspace navigation"
 platforms = ["linux", "macos", "windows"]

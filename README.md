@@ -1,5 +1,8 @@
 # herdr-plugin-last
 
+Folked from [m4salah/herdr-plugin-last](https://github.com/m4salah/herdr-plugin-last/).
+Add Windows support.
+
 tmux-style `last-window` and `switch-client -l` for [Herdr](https://herdr.dev).
 
 - **last tab** — jump to the most recently visited tab *in the current workspace*
@@ -19,7 +22,7 @@ machine.
 ## Install
 
 ```bash
-herdr plugin install m4salah/herdr-plugin-last
+herdr plugin install slotport/herdr-plugin-last
 ```
 
 A public repo is listed in Herdr's plugin marketplace by adding the GitHub topic
@@ -31,13 +34,13 @@ Then bind the keys in `~/.config/herdr/config.toml`:
 [[keys.command]]
 key = "prefix+semicolon"
 type = "plugin_action"
-command = "m4salah.last.last-tab"
+command = "slotport.last.last-tab"
 description = "last tab"
 
 [[keys.command]]
 key = "prefix+quote"
 type = "plugin_action"
-command = "m4salah.last.last-workspace"
+command = "slotport.last.last-workspace"
 description = "last workspace"
 ```
 
@@ -52,7 +55,7 @@ last-tab:
 [[keys.command]]
 key = "prefix+tab"
 type = "plugin_action"
-command = "m4salah.last.last-tab"
+command = "slotport.last.last-tab"
 description = "last tab"
 ```
 
