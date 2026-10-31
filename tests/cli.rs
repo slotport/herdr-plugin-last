@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 //! End-to-end tests for the `last` binary's entrypoint layer.
 //!
 //! This is the Rust port of the old `test.sh`. The pure logic (MRU ordering,

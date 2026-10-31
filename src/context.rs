@@ -58,6 +58,7 @@ pub(crate) static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
     #[test]
     fn session_key_sanitises_the_full_socket_path() {
         assert_eq!(
