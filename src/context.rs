@@ -34,7 +34,7 @@ impl Context {
 /// `~/.config/herdr/herdr.sock`, so every session shares the basename
 /// `herdr.sock`; keying on it would make concurrent sessions share one history.
 pub fn session_key(socket_path: &str) -> String {
-    socket_path.replace('/', "_")
+    socket_path.replace(std::path::MAIN_SEPARATOR, "_")
 }
 
 /// Reads an environment variable, treating unset and empty as identical. This

@@ -44,7 +44,7 @@ fn session_dir(state_dir: &Path, socket_path: &str) -> PathBuf {
     } else {
         socket_path
     };
-    state_dir.join(effective.replace('/', "_"))
+    state_dir.join(effective.replace(std::path::MAIN_SEPARATOR, "_"))
 }
 
 /// A throwaway sandbox: a temp directory containing a `state` subdirectory
